@@ -55,14 +55,25 @@ def render_graph_SceneDebugger():
 
 def render_graph_test():
     g = RenderGraph("test_graph")
+
     SunShadowMapPass = createPass("ShadowDepthPass", {'shadowCamera': 'sunCamera', 'forceCullMode': True, 'cull': 'None'})
     g.addPass(SunShadowMapPass, "SunShadowMapPass")
-    GBufferPass = createPass("GBufferRT", {'samplePattern': 'Stratified', 'sampleCount': 16})
+
+    GBufferPass = createPass("GBufferRT", {'samplePattern': 'Center', 'sampleCount': 1})
     g.addPass(GBufferPass, "GBufferRT")
+
+    ShadowProjectionPass = createPass("ShadowProjectionPass", {'shadowCamera': 'sunCamera', 'shadowBias': 0.005})
+    g.addPass(ShadowProjectionPass, "ShadowProjectionPass")
+
+    g.addEdge("SunShadowMapPass.shadowDepth", "ShadowProjectionPass.shadowDepth")
+    g.addEdge("GBufferRT.depth", "ShadowProjectionPass.GBufferDepth")
+
     #SceneDebugger = createPass('SceneDebugger')
     #g.addPass(SceneDebugger, 'SceneDebugger')
+
     g.markOutput("SunShadowMapPass.shadowDepth")
     g.markOutput("GBufferRT.guideNormalW")
+    g.markOutput("ShadowProjectionPass.shadowMask")
     return g
 
 def render_graph_sun_shadow_map():
@@ -102,22 +113,3 @@ mainCam = m.scene.cameras[1]  # assuming main camera is the second added
 print("sunCamera:", sunCam.position, sunCam.target)
 print("mainCamera:", mainCam.position, mainCam.target)
 
-# Capture frames with clock paused and then exit
-
-#m.clock.pause()
-#for f in [1, 2, 3]:
-#    # Shadow first
-#    m.scene.camera = sunCam
-#    m.renderGraph(shadow_depth_graph)
-#    m.setActiveGraph(shadow_depth_graph)
-#
-#    # Inject shadow map if needed:
-#    # shadow_tex = gShadow.getOutput("Shadow.depth")
-#    # m.updatePass(gMain, "Lighting", Dictionary({"shadowMap": shadow_tex}))
-#
-#    # Main render
-#    m.scene.camera = mainCam
-#    m.setActiveGraph(test_graph)
-#
-#    # Capture this frame from the active graph (gMain)
-#    m.frameCapture.capture()

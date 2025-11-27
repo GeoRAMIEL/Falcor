@@ -19,11 +19,6 @@ const char kShadowCamera[] = "shadowCamera";
 const std::string kShadowDepthPassData = "gShadowDepthPassData";
 } // namespace
 
-extern "C" FALCOR_API_EXPORT void registerPlugin(Falcor::PluginRegistry& registry)
-{
-    registry.registerClass<RenderPass, ShadowDepthPass>();
-}
-
 ShadowDepthPass::ShadowDepthPass(ref<Device> pDevice, const Properties& props) : RenderPass(pDevice)
 {
     parseProperties(props);

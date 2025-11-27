@@ -5,17 +5,17 @@
 
 using namespace Falcor;
 
-class ShadowDepthPass : public RenderPass
+class ShadowProjectionPass : public RenderPass
 {
 public:
-    FALCOR_PLUGIN_CLASS(ShadowDepthPass, "ShadowDepthPass", "Insert pass description here.");
+    FALCOR_PLUGIN_CLASS(ShadowProjectionPass, "ShadowProjectionPass", "Insert pass description here.");
 
-    static ref<ShadowDepthPass> create(ref<Device> pDevice, const Properties& props)
+    static ref<ShadowProjectionPass> create(ref<Device> pDevice, const Properties& props)
     {
-        return make_ref<ShadowDepthPass>(pDevice, props);
+        return make_ref<ShadowProjectionPass>(pDevice, props);
     }
 
-    ShadowDepthPass(ref<Device> pDevice, const Properties& props);
+    ShadowProjectionPass(ref<Device> pDevice, const Properties& props);
 
     virtual Properties getProperties() const override;
     virtual RenderPassReflection reflect(const CompileData& compileData) override;
@@ -28,14 +28,11 @@ public:
 
 private:
     virtual void parseProperties(const Properties& props);
-    virtual void setCullMode(RasterizerState::CullMode mode) { mCullMode = mode; }
     void updateFrameDim(const uint2 frameDim);
 
     ref<Texture> getOutput(const RenderData& renderData) const;
 
     void recreatePrograms();
-
-    void bindParameterBlock();
 
     // Internal state
 
@@ -44,38 +41,24 @@ private:
     /// IScene::UpdateFlags accumulated since last `beginFrame()`
     IScene::UpdateFlags mUpdateFlags = IScene::UpdateFlags::None;
 
-    /// Frames rendered since last change of scene. This is used as random seed.
-    uint32_t mFrameCount = 0;
-    /// Current frame dimension in pixels. Note this may be different from the window size.
+    /// Current frame dimension in pixels. Should be the same as the window size at least for now.
     uint2 mFrameDim = {};
     float2 mInvFrameDim = {};
 
     // UI variables
-
-    /// Selected output size.
-    RenderPassHelpers::IOSize mOutputSizeSelection = RenderPassHelpers::IOSize::Fixed;
-    /// Output size in pixels when 'Fixed' size is selected.
-    uint2 mFixedOutputSize = {512, 512};
-    /// Enable alpha test.
-    bool mUseAlphaTest = true;
-    /// Force cull mode for all geometry, otherwise set it based on the scene.
-    bool mForceCullMode = false;
-    /// Cull mode to use for when mForceCullMode is true.
-    RasterizerState::CullMode mCullMode = RasterizerState::CullMode::Back;
-    /// Shadow camera name (if empty, use the active scene camera)
+    /// Shadow camera name (cannot be empty)
     std::string mShadowCameraName;
+    /// Shadow Bias
+    float mShadowBias = 0.005f;
 
     /// Indicates whether any options that affect the output have changed since last frame.
     bool mOptionsChanged = false;
 
     ref<Fbo> mpFbo;
 
-    struct
-    {
-        ref<GraphicsState> pState;
-        ref<Program> pProgram;
-        ref<ProgramVars> pVars;
-    } mDepthPass;
+    ref<Program> mpProgram;
+    ref<ProgramVars> mpVars;
+    ref<ComputeState> mpState;
 
-    ref<ParameterBlock> mpShadowDepthBlock;
+    ref<ParameterBlock> mpShadowProjectionBlock;
 };
