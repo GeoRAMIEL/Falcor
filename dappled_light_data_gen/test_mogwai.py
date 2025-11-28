@@ -56,19 +56,19 @@ def render_graph_SceneDebugger():
 def render_graph_test():
     g = RenderGraph("test_graph")
 
-    SunShadowMapPass = createPass("ShadowDepthPass", {'shadowCamera': 'sunCamera', 'forceCullMode': True, 'cull': 'None'})
+    SunShadowMapPass = createPass("ShadowDepthPass", {'shadowCamera': 'sunCamera', 'outputSize': 4096, 'forceCullMode': True, 'cull': 'None'})
     g.addPass(SunShadowMapPass, "SunShadowMapPass")
 
     GBufferPass = createPass("GBufferRT", {'samplePattern': 'Center', 'sampleCount': 1})
     g.addPass(GBufferPass, "GBufferRT")
 
-    #ShadowProjectionPass = createPass("ShadowProjectionPass", {'shadowCamera': 'sunCamera', 'shadowBias': 0.005})
+    #ShadowProjectionPass = createPass("ShadowProjectionPass", {'shadowCamera': 'sunCamera', 'shadowBias': 0.0002})
     #g.addPass(ShadowProjectionPass, "ShadowProjectionPass")
 
     #g.addEdge("SunShadowMapPass.shadowDepth", "ShadowProjectionPass.shadowDepth")
     #g.addEdge("GBufferRT.depth", "ShadowProjectionPass.GBufferDepth")
 
-    NSSMFeaturePass = createPass("NSSMFeaturePass", {'shadowCamera': 'sunCamera', 'light': 'Sun Light Distant', 'shadowBias': 0.005})
+    NSSMFeaturePass = createPass("NSSMFeaturePass", {'shadowCamera': 'sunCamera', 'light': 'Sun Light Distant', 'shadowBias': 0.0002})
     g.addPass(NSSMFeaturePass, "NSSMFeaturePass")
 
     g.addEdge("SunShadowMapPass.shadowDepth", "NSSMFeaturePass.shadowDepth")

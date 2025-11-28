@@ -9,7 +9,6 @@ const RasterizerState::CullMode kDefaultCullMode = RasterizerState::CullMode::Ba
 const std::string kDepthName = "shadowDepth";
 // Scripting options.
 const char kOutputSize[] = "outputSize";
-const char kFixedOutputSize[] = "fixedOutputSize";
 const char kSampleCount[] = "sampleCount";
 const char kUseAlphaTest[] = "useAlphaTest";
 const char kForceCullMode[] = "forceCullMode";
@@ -38,9 +37,7 @@ ShadowDepthPass::ShadowDepthPass(ref<Device> pDevice, const Properties& props) :
 Properties ShadowDepthPass::getProperties() const
 {
     Properties props;
-    props[kOutputSize] = mOutputSizeSelection;
-    if (mOutputSizeSelection == RenderPassHelpers::IOSize::Fixed)
-        props[kFixedOutputSize] = mFixedOutputSize;
+    props[kOutputSize] = mOutputSize;
     props[kUseAlphaTest] = mUseAlphaTest;
     props[kForceCullMode] = mForceCullMode;
     props[kCullMode] = mCullMode;
@@ -50,7 +47,7 @@ Properties ShadowDepthPass::getProperties() const
 
 RenderPassReflection ShadowDepthPass::reflect(const CompileData& compileData)
 {
-    const uint2 sz = RenderPassHelpers::calculateIOSize(mOutputSizeSelection, mFixedOutputSize, compileData.defaultTexDims);
+    const uint2 sz = {mOutputSize, mOutputSize};
     
     RenderPassReflection reflector;
     reflector.addOutput(kDepthName, "Depth buffer")
@@ -165,15 +162,8 @@ void ShadowDepthPass::bindParameterBlock()
 
 void ShadowDepthPass::renderUI(Gui::Widgets& widget)
 {
-    // Controls for output size.
-    // When output size requirements change, we'll trigger a graph recompile to update the render pass I/O sizes.
-    if (widget.dropdown("Output size", mOutputSizeSelection))
-        requestRecompile();
-    if (mOutputSizeSelection == RenderPassHelpers::IOSize::Fixed)
-    {
-        if (widget.var("Size in pixels", mFixedOutputSize, 32u, 16384u))
-            requestRecompile();
-    }
+    widget.var("Size in pixels", mOutputSize, 32u, 16384u);
+    widget.tooltip("Set the size of the shadow map texture in pixels.");
 
     // Misc controls.
     mOptionsChanged |= widget.checkbox("Alpha Test", mUseAlphaTest);
@@ -203,9 +193,7 @@ void ShadowDepthPass::parseProperties(const Properties& props)
     for (const auto& [key, value] : props)
     {
         if (key == kOutputSize)
-            mOutputSizeSelection = value;
-        else if (key == kFixedOutputSize)
-            mFixedOutputSize = value;
+            mOutputSize = value;
         else if (key == kUseAlphaTest)
             mUseAlphaTest = value;
         else if (key == kForceCullMode)

@@ -54,8 +54,8 @@ private:
 
     /// Selected output size.
     RenderPassHelpers::IOSize mOutputSizeSelection = RenderPassHelpers::IOSize::Fixed;
-    /// Output size in pixels when 'Fixed' size is selected.
-    uint2 mFixedOutputSize = {512, 512};
+    /// Output size in pixels
+    uint mOutputSize = 512;
     /// Enable alpha test.
     bool mUseAlphaTest = true;
     /// Force cull mode for all geometry, otherwise set it based on the scene.

@@ -69,15 +69,16 @@ void nssmFeaturePass(uint3 dispatchThreadId: SV_DispatchThreadID)
     lightSpaceUV.y = 1.0 - lightSpaceUV.y;
     float shadowSpaceObjectDepth = lightSpaceObjPosH.z;
 
-    // Default feature values.
-    float shadow = 1.0;
+    
+    // Default feature values. ===============================
     // View direction from receiver towards main camera position.
     float3 V = normalize(gMainCamera.data.posW - posW);
     float ndotv = dot(N, V);
     float ndotl = dot(N, L);
-    // TODO: do we need to set shadowMask to 0 for ndotl<0 pixels?
+    // set shadowMask to 0 for ndotl<0 pixels
+    float shadow = ndotl > 0 ? 1.0 : 0.0;
     // Use a dummy light source position to conform with KPNSM expectations.
-    float3 lightPosW = gShadowCamera.data.posW - L * 1000;
+    float3 lightPosW = gShadowCamera.data.posW - L * 0.01;
     float distRtoB = 0.0; // Treat blocker pos as reveiver pos by default
     float distEtoR = length(lightPosW - posW);
     float distVtoR = length(gMainCamera.data.posW - posW);
