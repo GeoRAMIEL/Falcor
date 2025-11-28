@@ -29,14 +29,15 @@ def read_exr_data(folder_path, exr_file, channels, scale=1.0):
     return np.stack(data, axis=0)
 
 # just some renaming for now
-# Mogwai.NSSMFeaturePass.ce.1.exr => Mogwai.MyGBuffer.ce.15.exr
-# Mogwai.NSSMFeaturePass.cv.1.exr => Mogwai.MyGBuffer.cv.15.exr
-# Mogwai.NSSMFeaturePass.distEtoR.1.exr => Mogwai.MyGBuffer.distE.15.exr
-# Mogwai.NSSMFeaturePass.distVtoR.1.exr => Mogwai.MyGBuffer.distV.15.exr
-# Mogwai.GBufferRT.guideNormalW.1.exr => Mogwai.MyGBuffer.normW.15.exr
-# Mogwai.NSSMFeaturePass.posW.1.exr => Mogwai.MyGBuffer.posW.15.exr
-# Mogwai.NSSMFeaturePass.shadowMask.1.exr => Mogwai.MyShadowMap.color.15.exr
-# Mogwai.NSSMFeaturePass.shadowMask.1.exr => Mogwai.MyGBuffer.visibility.70.exr
+# Mogwai.NSSMFeaturePass.ce.1.exr            => Mogwai.MyGBuffer.ce.15.exr
+# Mogwai.NSSMFeaturePass.cv.1.exr            => Mogwai.MyGBuffer.cv.15.exr
+# Mogwai.NSSMFeaturePass.distEtoR.1.exr      => Mogwai.MyGBuffer.distE.15.exr
+# Mogwai.NSSMFeaturePass.distVtoR.1.exr      => Mogwai.MyGBuffer.distV.15.exr
+# Mogwai.GBufferRT.guideNormalW.1.exr        => Mogwai.MyGBuffer.normW.15.exr
+# Mogwai.NSSMFeaturePass.posW.1.exr          => Mogwai.MyGBuffer.posW.15.exr
+# Mogwai.NSSMFeaturePass.shadowMask.1.exr    => Mogwai.MyShadowMap.color.15.exr
+# Mogwai.NSSMFeaturePass.shadowMask.1.exr    => Mogwai.MyGBuffer.visibility.70.exr
+# Mogwai.PathTracer.shadowFactor.1.exr       => Mogwai.AccumulatePass2.output.90.exr
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -57,7 +58,8 @@ if __name__ == "__main__":
         ("Mogwai.GBufferRT.guideNormalW.1.exr", "Mogwai.MyGBuffer.normW.15.exr"),
         ("Mogwai.NSSMFeaturePass.posW.1.exr", "Mogwai.MyGBuffer.posW.15.exr"),
         ("Mogwai.NSSMFeaturePass.shadowMask.1.exr", "Mogwai.MyShadowMap.color.15.exr"),
-        ("Mogwai.NSSMFeaturePass.shadowMask.1.exr", "Mogwai.MyGBuffer.visibility.70.exr")
+        ("Mogwai.NSSMFeaturePass.shadowMask.1.exr", "Mogwai.MyGBuffer.visibility.70.exr"),
+        ("Mogwai.PathTracer.shadowFactor.1.exr", "Mogwai.AccumulatePass2.output.90.exr"),
     ]
 
     for in_file, out_file in file_mappings:
