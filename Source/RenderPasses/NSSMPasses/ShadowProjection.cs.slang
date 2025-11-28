@@ -28,7 +28,7 @@ void shadowProjection(uint3 dispatchThreadId: SV_DispatchThreadID)
         gShadowMask[pixelPos] = 1.0;
         return;
     }
-    float4 objPosH = float4(uv * 2.0 - 1.0, sceneDepth * 2.0 - 1.0, 1.0);
+    float4 objPosH = float4(uv.x * 2.0 - 1.0, (1.0 - uv.y) * 2.0 - 1.0, sceneDepth, 1.0);
     float4 objPosW = mul(gMainCamera.data.invViewProj, objPosH);
     objPosW /= objPosW.w;
 
@@ -36,7 +36,8 @@ void shadowProjection(uint3 dispatchThreadId: SV_DispatchThreadID)
     float4 lightSpaceObjPosH = mul(gShadowCamera.getViewProj(), objPosW);
     lightSpaceObjPosH /= lightSpaceObjPosH.w;
     float2 lightSpaceUV = lightSpaceObjPosH.xy * 0.5 + 0.5;
-    float shadowSpaceObjectDepth = lightSpaceObjPosH.z * 0.5 + 0.5;
+    lightSpaceUV.y = 1.0 - lightSpaceUV.y;
+    float shadowSpaceObjectDepth = lightSpaceObjPosH.z;
 
     if (lightSpaceUV.x < 0.0 || lightSpaceUV.x > 1.0 || lightSpaceUV.y < 0.0 || lightSpaceUV.y > 1.0)
     {

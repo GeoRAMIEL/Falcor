@@ -82,9 +82,14 @@ def render_graph_test():
     g.markOutput("GBufferRT.guideNormalW")
     #g.markOutput("ShadowProjectionPass.shadowMask")
     g.markOutput("NSSMFeaturePass.shadowMask")
-    g.markOutput("NSSMFeaturePass.NdotL")
-    g.markOutput("NSSMFeaturePass.blockerDistance")
     g.markOutput("NSSMFeaturePass.cv")
+    g.markOutput("NSSMFeaturePass.ce")
+    g.markOutput("NSSMFeaturePass.distRtoB")
+    g.markOutput("NSSMFeaturePass.distEtoR")
+    g.markOutput("NSSMFeaturePass.distVtoR")
+    g.markOutput("NSSMFeaturePass.distEtoB")
+    g.markOutput("NSSMFeaturePass.posW")
+    #g.markOutput("SceneDebugger.output")
     return g
 
 def render_graph_sun_shadow_map():

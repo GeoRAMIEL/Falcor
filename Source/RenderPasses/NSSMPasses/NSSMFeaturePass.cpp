@@ -5,13 +5,19 @@ namespace
 {
 const std::string kNSSMFeaturePassProgramFile = "RenderPasses/NSSMPasses/NSSMFeaturePass.cs.slang";
 
+// Input names
 const std::string kShadowDepthName = "shadowDepth";
 const std::string kGBufferDepthName = "GBufferDepth";
 const std::string kGBufferNormalName = "GBufferNormal";
-const std::string kShadowMaskName = "shadowMask";
-const std::string kNdotLName = "NdotL";
-const std::string kBlockerDistanceName = "blockerDistance";
-const std::string kCvName = "cv";
+// Output names
+const std::string kShadowMaskName = "shadowMask"; // R, G: shadow mask, B: distRtoB
+const std::string kCvName = "cv"; // N dot V
+const std::string kCeName = "ce"; // N dot L
+const std::string kDistRtoB = "distRtoB"; // Receiver to blocker distance
+const std::string kDistEtoR = "distEtoR"; // Receiver to emitter distance
+const std::string kDistVtoR = "distVtoR"; // Receiver to view point distance
+const std::string kDistEtoB = "distEtoB"; // Emitter to blocker distance
+const std::string kPosW = "posW"; // World position of receiver
 
 // Scripting options.
 const char kShadowCamera[] = "shadowCamera";
@@ -49,22 +55,42 @@ RenderPassReflection NSSMFeaturePass::reflect(const CompileData& compileData)
         .bindFlags(ResourceBindFlags::ShaderResource);
 
     reflector.addOutput(kShadowMaskName, "Shadow mask")
+        .format(ResourceFormat::RGBA32Float)
+        .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
+        .texture2D(sz.x, sz.y);
+
+    reflector.addOutput(kCvName, "N dot V")
         .format(ResourceFormat::R32Float)
         .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
         .texture2D(sz.x, sz.y);
 
-    reflector.addOutput(kNdotLName, "N dot L")
+    reflector.addOutput(kCeName, "N dot L")
         .format(ResourceFormat::R32Float)
         .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
         .texture2D(sz.x, sz.y);
 
-    reflector.addOutput(kBlockerDistanceName, "Blocker distance")
+    reflector.addOutput(kDistRtoB, "Receiver to blocker distance")
         .format(ResourceFormat::R32Float)
         .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
         .texture2D(sz.x, sz.y);
 
-    reflector.addOutput(kCvName, "Receiver normal dot view direction")
+    reflector.addOutput(kDistEtoR, "Receiver to emitter distance")
         .format(ResourceFormat::R32Float)
+        .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
+        .texture2D(sz.x, sz.y);
+
+    reflector.addOutput(kDistVtoR, "Viewpoint to receiver distance")
+        .format(ResourceFormat::R32Float)
+        .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
+        .texture2D(sz.x, sz.y);
+
+    reflector.addOutput(kDistEtoB, "Emitter to blocker distance")
+        .format(ResourceFormat::R32Float)
+        .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
+        .texture2D(sz.x, sz.y);
+    
+    reflector.addOutput(kPosW, "World position of receiver")
+        .format(ResourceFormat::RGBA32Float)
         .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
         .texture2D(sz.x, sz.y);
 
@@ -87,9 +113,13 @@ void NSSMFeaturePass::execute(RenderContext* pRenderContext, const RenderData& r
     auto pGBufferNormalTex = renderData.getTexture(kGBufferNormalName);
 
     auto pShadowMaskTex = renderData.getTexture(kShadowMaskName);
-    auto pNdotLTex = renderData.getTexture(kNdotLName);
-    auto pBlockerDistanceTex = renderData.getTexture(kBlockerDistanceName);
     auto pCvTex = renderData.getTexture(kCvName);
+    auto pCeTex = renderData.getTexture(kCeName);
+    auto pDistRtoBTex = renderData.getTexture(kDistRtoB);
+    auto pDistEtoRTex = renderData.getTexture(kDistEtoR);
+    auto pDistVtoRTex = renderData.getTexture(kDistVtoR);
+    auto pDistEtoBTex = renderData.getTexture(kDistEtoB);
+    auto pPosWTex = renderData.getTexture(kPosW);
 
     // Update frame dimension based on render pass output.
     FALCOR_ASSERT(pShadowMaskTex);
@@ -98,9 +128,13 @@ void NSSMFeaturePass::execute(RenderContext* pRenderContext, const RenderData& r
     // Clear outputs.
     float4 one = float4(1.f, 1.f, 1.f, 1.f);
     pRenderContext->clearUAV(pShadowMaskTex->getUAV().get(), one);
-    pRenderContext->clearUAV(pNdotLTex->getUAV().get(), float4(0.f));
-    pRenderContext->clearUAV(pBlockerDistanceTex->getUAV().get(), float4(0.f));
     pRenderContext->clearUAV(pCvTex->getUAV().get(), float4(0.f));
+    pRenderContext->clearUAV(pCeTex->getUAV().get(), float4(0.f));
+    pRenderContext->clearUAV(pDistRtoBTex->getUAV().get(), float4(0.f));
+    pRenderContext->clearUAV(pDistEtoRTex->getUAV().get(), float4(0.f));
+    pRenderContext->clearUAV(pDistVtoRTex->getUAV().get(), float4(0.f));
+    pRenderContext->clearUAV(pDistEtoBTex->getUAV().get(), float4(0.f));
+    pRenderContext->clearUAV(pPosWTex->getUAV().get(), float4(0.f));
 
     // If there is no scene, just return.
     if (mpScene == nullptr)
@@ -131,9 +165,13 @@ void NSSMFeaturePass::execute(RenderContext* pRenderContext, const RenderData& r
     var["gGBufferDepth"] = pGBufferDepthTex;
     var["gGBufferNormal"] = pGBufferNormalTex;
     var["gShadowMask"] = pShadowMaskTex;
-    var["gNdotL"] = pNdotLTex;
-    var["gBlockerDistance"] = pBlockerDistanceTex;
     var["gCv"] = pCvTex;
+    var["gCe"] = pCeTex;
+    var["gDistRtoB"] = pDistRtoBTex;
+    var["gDistEtoR"] = pDistEtoRTex;
+    var["gDistVtoR"] = pDistVtoRTex;
+    var["gDistEtoB"] = pDistEtoBTex;
+    var["gPosW"] = pPosWTex;
     var["PerFrameCB"]["gResolution"] = mFrameDim;
     var["PerFrameCB"]["gInvResolution"] = mInvFrameDim;
 
@@ -144,6 +182,7 @@ void NSSMFeaturePass::execute(RenderContext* pRenderContext, const RenderData& r
     for (const auto& pCam : allCameras)
     {
         if (pCam->getName() != mShadowCameraName) continue;
+        logWarning("====== Found shadow camera {}. ======", pCam->getName());
         pCam->bindShaderData(var["PerFrameCB"]["gShadowCamera"]);
         break;
     }
