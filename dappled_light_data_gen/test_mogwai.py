@@ -62,18 +62,29 @@ def render_graph_test():
     GBufferPass = createPass("GBufferRT", {'samplePattern': 'Center', 'sampleCount': 1})
     g.addPass(GBufferPass, "GBufferRT")
 
-    ShadowProjectionPass = createPass("ShadowProjectionPass", {'shadowCamera': 'sunCamera', 'shadowBias': 0.005})
-    g.addPass(ShadowProjectionPass, "ShadowProjectionPass")
+    #ShadowProjectionPass = createPass("ShadowProjectionPass", {'shadowCamera': 'sunCamera', 'shadowBias': 0.005})
+    #g.addPass(ShadowProjectionPass, "ShadowProjectionPass")
 
-    g.addEdge("SunShadowMapPass.shadowDepth", "ShadowProjectionPass.shadowDepth")
-    g.addEdge("GBufferRT.depth", "ShadowProjectionPass.GBufferDepth")
+    #g.addEdge("SunShadowMapPass.shadowDepth", "ShadowProjectionPass.shadowDepth")
+    #g.addEdge("GBufferRT.depth", "ShadowProjectionPass.GBufferDepth")
+
+    NSSMFeaturePass = createPass("NSSMFeaturePass", {'shadowCamera': 'sunCamera', 'light': 'Sun Light Distant', 'shadowBias': 0.005})
+    g.addPass(NSSMFeaturePass, "NSSMFeaturePass")
+
+    g.addEdge("SunShadowMapPass.shadowDepth", "NSSMFeaturePass.shadowDepth")
+    g.addEdge("GBufferRT.depth", "NSSMFeaturePass.GBufferDepth")
+    g.addEdge("GBufferRT.guideNormalW", "NSSMFeaturePass.GBufferNormal")
 
     #SceneDebugger = createPass('SceneDebugger')
     #g.addPass(SceneDebugger, 'SceneDebugger')
 
     g.markOutput("SunShadowMapPass.shadowDepth")
     g.markOutput("GBufferRT.guideNormalW")
-    g.markOutput("ShadowProjectionPass.shadowMask")
+    #g.markOutput("ShadowProjectionPass.shadowMask")
+    g.markOutput("NSSMFeaturePass.shadowMask")
+    g.markOutput("NSSMFeaturePass.NdotL")
+    g.markOutput("NSSMFeaturePass.blockerDistance")
+    g.markOutput("NSSMFeaturePass.cv")
     return g
 
 def render_graph_sun_shadow_map():
@@ -98,8 +109,8 @@ except NameError: None
 m.frameCapture.outputDir = "/workspace/develop/Falcor/dappled_light_data_gen/mogwai_renders"
 m.frameCapture.baseFilename = "Mogwai"
 
-m.clock.exitFrame = 4
-m.frameCapture.addFrames(m.activeGraph, [1, 2, 3])
+m.clock.exitFrame = 2
+m.frameCapture.addFrames(m.activeGraph, [1])
 
 def onSceneUpdate(scene, time):
     print("======== onSceneUpdate called. ========")
