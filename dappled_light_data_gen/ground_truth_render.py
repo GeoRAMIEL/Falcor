@@ -17,6 +17,7 @@ def render_graph_PathTracer():
     g.addEdge("PathTracer.color", "AccumulatePass.input")
     g.addEdge("AccumulatePass.output", "ToneMapper.src")
     g.markOutput("ToneMapper.dst")
+    g.markOutput("PathTracer.shadowFactor")
     return g
 
 

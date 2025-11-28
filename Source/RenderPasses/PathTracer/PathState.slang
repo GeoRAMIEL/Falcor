@@ -99,6 +99,10 @@ struct PathState
     float3      thp;                    ///< Path throughput.
     float3      L;                      ///< Accumulated path contribution.
 
+    float       shadowFactor;           ///< Shadow factor.
+    float3      directUnshadowed;
+    float3      directShadowed;
+
     GuideData   guideData;              ///< Denoiser guide data.
     InteriorList interiorList;          ///< Interior list. Keeping track of a stack of materials with medium properties.
     SampleGenerator sg;                 ///< Sample generator state. Typically 4-16B.

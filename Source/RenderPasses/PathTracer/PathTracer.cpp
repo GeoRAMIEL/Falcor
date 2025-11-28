@@ -78,6 +78,7 @@ namespace
     const std::string kOutputNRDDeltaTransmissionPathLength = "nrdDeltaTransmissionPathLength";
     const std::string kOutputNRDDeltaTransmissionPosW = "nrdDeltaTransmissionPosW";
     const std::string kOutputNRDResidualRadianceHitDist = "nrdResidualRadianceHitDist";
+    const std::string kOutputShadowFactor = "shadowFactor";
 
     const Falcor::ChannelList kOutputChannels =
     {
@@ -108,6 +109,7 @@ namespace
         { kOutputNRDDeltaTransmissionPathLength,            "",     "Output delta transmission path length", true /* optional */, ResourceFormat::R16Float },
         { kOutputNRDDeltaTransmissionPosW,                  "",     "Output delta transmission position", true /* optional */, ResourceFormat::RGBA32Float },
         { kOutputNRDResidualRadianceHitDist,                "",     "Output residual color (linear) and hit distance", true /* optional */, ResourceFormat::RGBA32Float },
+        { kOutputShadowFactor,                              "",     "Output shadow factor", true /* optional */, ResourceFormat::R32Float },
     };
 
     // Scripting options.
@@ -904,6 +906,19 @@ void PathTracer::prepareResources(RenderContext* pRenderContext, const RenderDat
         mpSampleNRDReflectance = mpDevice->createStructuredBuffer(var["sampleNRDReflectance"], sampleCount, ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess, MemoryType::DeviceLocal, nullptr, false);
         mVarsChanged = true;
     }
+
+    if ((!mpSampleShadowFactor || mpSampleShadowFactor->getElementCount() < sampleCount || mVarsChanged))
+    {
+        mpSampleShadowFactor = mpDevice->createStructuredBuffer(
+            var["sampleShadowFactor"],
+            sampleCount,
+            ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess,
+            MemoryType::DeviceLocal,
+            nullptr,
+            false
+        );
+        mVarsChanged = true;
+    }
 }
 
 void PathTracer::preparePathTracer(const RenderData& renderData)
@@ -1097,6 +1112,8 @@ void PathTracer::bindShaderData(const ShaderVar& var, const RenderData& renderDa
         var["sampleOffset"] = mpSampleOffset; // Can be nullptr
         var["sampleColor"] = mpSampleColor;
         var["sampleGuideData"] = mpSampleGuideData;
+
+        var["sampleShadowFactor"] = mpSampleShadowFactor;
     }
 
     // Bind runtime data.
@@ -1121,6 +1138,7 @@ void PathTracer::bindShaderData(const ShaderVar& var, const RenderData& renderDa
     var["viewDir"] = pViewDir; // Can be nullptr
     var["sampleCount"] = pSampleCount; // Can be nullptr
     var["outputColor"] = renderData.getTexture(kOutputColor);
+    var["outputShadowFactor"] = renderData.getTexture(kOutputShadowFactor);
 
     if (useLightSampling && mpEmissiveSampler)
     {
@@ -1218,6 +1236,8 @@ bool PathTracer::beginFrame(RenderContext* pRenderContext, const RenderData& ren
         || renderData[kOutputNRDEmission] != nullptr
         || renderData[kOutputNRDDiffuseReflectance] != nullptr
         || renderData[kOutputNRDSpecularReflectance] != nullptr;
+    
+    mOutputShadowFactor = renderData[kOutputShadowFactor] != nullptr;
 
     // Check if additional NRD data should be generated.
     bool prevOutputNRDAdditionalData = mOutputNRDAdditionalData;
@@ -1301,6 +1321,9 @@ void PathTracer::generatePaths(RenderContext* pRenderContext, const RenderData& 
     mpGeneratePaths->addDefine("OUTPUT_NRD_DATA", mOutputNRDData ? "1" : "0");
     mpGeneratePaths->addDefine("OUTPUT_NRD_ADDITIONAL_DATA", mOutputNRDAdditionalData ? "1" : "0");
 
+    // For shadow factor output.
+    mpGeneratePaths->addDefine("OUTPUT_SHADOW_FACTOR", mOutputShadowFactor ? "1" : "0");
+
     // Bind resources.
     auto var = mpGeneratePaths->getRootVar()["CB"]["gPathGenerator"];
     bindShaderData(var, renderData, false);
@@ -1325,6 +1348,9 @@ void PathTracer::tracePass(RenderContext* pRenderContext, const RenderData& rend
     tracePass.pProgram->addDefine("OUTPUT_GUIDE_DATA", mOutputGuideData ? "1" : "0");
     tracePass.pProgram->addDefine("OUTPUT_NRD_DATA", mOutputNRDData ? "1" : "0");
     tracePass.pProgram->addDefine("OUTPUT_NRD_ADDITIONAL_DATA", mOutputNRDAdditionalData ? "1" : "0");
+
+    // For shadow factor output.
+    tracePass.pProgram->addDefine("OUTPUT_SHADOW_FACTOR", mOutputShadowFactor ? "1" : "0");
 
     // Bind global resources.
     auto var = tracePass.pVars->getRootVar();
@@ -1358,6 +1384,8 @@ void PathTracer::resolvePass(RenderContext* pRenderContext, const RenderData& re
     mpResolvePass->addDefine("OUTPUT_GUIDE_DATA", mOutputGuideData ? "1" : "0");
     mpResolvePass->addDefine("OUTPUT_NRD_DATA", mOutputNRDData ? "1" : "0");
 
+    mpResolvePass->addDefine("OUTPUT_SHADOW_FACTOR", mOutputShadowFactor ? "1" : "0");
+
     // Bind resources.
     auto var = mpResolvePass->getRootVar()["CB"]["gResolvePass"];
     var["params"].setBlob(mParams);
@@ -1374,6 +1402,8 @@ void PathTracer::resolvePass(RenderContext* pRenderContext, const RenderData& re
     var["outputNRDDeltaTransmissionRadianceHitDist"] = renderData.getTexture(kOutputNRDDeltaTransmissionRadianceHitDist);
     var["outputNRDResidualRadianceHitDist"] = renderData.getTexture(kOutputNRDResidualRadianceHitDist);
 
+    var["outputShadowFactor"] = renderData.getTexture(kOutputShadowFactor);
+
     if (mVarsChanged)
     {
         var["sampleOffset"] = mpSampleOffset; // Can be nullptr
@@ -1386,6 +1416,8 @@ void PathTracer::resolvePass(RenderContext* pRenderContext, const RenderData& re
 
         var["sampleNRDPrimaryHitNeeOnDelta"] = mpSampleNRDPrimaryHitNeeOnDelta;
         var["primaryHitDiffuseReflectance"] = renderData.getTexture(kOutputNRDDiffuseReflectance);
+
+        var["sampleShadowFactor"] = mpSampleShadowFactor;
     }
 
     // Launch one thread per pixel.
@@ -1454,6 +1486,7 @@ DefineList PathTracer::StaticParams::getDefines(const PathTracer& owner) const
     defines.add("OUTPUT_GUIDE_DATA", "0");
     defines.add("OUTPUT_NRD_DATA", "0");
     defines.add("OUTPUT_NRD_ADDITIONAL_DATA", "0");
+    defines.add("OUTPUT_SHADOW_FACTOR", "0");
 
     return defines;
 }

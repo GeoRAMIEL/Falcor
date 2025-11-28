@@ -85,6 +85,10 @@ struct PathTracer
 
     RWTexture2D<float4> outputColor;                ///< Output color buffer if kSamplesPerPixel == 1.
 
+    RWStructuredBuffer<float> sampleShadowFactor;       ///< Output per-sample shadow factor.
+
+    RWTexture2D<float> outputShadowFactor;                    ///< Output resolved shadow factor.
+
     /*******************************************************************
                                 Static members
     *******************************************************************/
@@ -99,6 +103,7 @@ struct PathTracer
 
     // Additional specialization.
     static const bool kOutputGuideData = OUTPUT_GUIDE_DATA;
+    static const bool kOutputShadowFactor = OUTPUT_SHADOW_FACTOR;
 
     /** Types of samplable lights.
     */
@@ -276,6 +281,10 @@ struct PathTracer
         path.setActive();
         path.id = pathID;
         path.thp = float3(1.f);
+
+        path.shadowFactor = 0.0f;
+        path.directUnshadowed = float3(0.f);
+        path.directShadowed = float3(0.f);
 
         const uint2 pixel = path.getPixel();
 
@@ -993,6 +1002,19 @@ struct PathTracer
 
                 float3 weight = mi.eval(sd, ls.dir, path.sg);
                 float3 Lr = weight * ls.Li;
+                // Treat back-facing directions as fully shadowed.
+                /*float NdotL = dot(sd.getOrientedFaceNormal(), ls.dir);
+                if (NdotL <= 0.f)
+                {
+                    if (path.getVertexIndex() == 1)
+                    {
+                        // We consider this a “potential” contribution that is fully shadowed.
+                        path.directUnshadowed += Lr;
+                        // Do NOT add to directShadowed or to path.L.
+                    }
+                    // Skip visibility ray entirely.
+                }
+                else */
                 if (any(Lr > 0.f))
                 {
                     Ray ray = ls.getVisibilityRay();
@@ -1008,12 +1030,31 @@ struct PathTracer
                         }
                     }
 
+                    if (path.getVertexIndex() == 1)
+                    {
+                        path.directUnshadowed += Lr; // expected contrib if visible
+                    }
                     logTraceRay(PixelStatsRayType::Visibility);
                     bool visible = vq.traceVisibilityRay(ray);
-                    if (visible) addToPathContribution(path, Lr);
+                    if (visible)
+                    {
+                        if (path.getVertexIndex() == 1)
+                        {
+                            path.shadowFactor = 1.0f;
+                            //path.directShadowed += Lr;
+                        }
+                        addToPathContribution(path, Lr);
+                    }
                 }
             }
         }
+
+        /*if (path.getVertexIndex() == 1 && any(path.directUnshadowed > 0.f))
+        {
+            float unsh = luminance(path.directUnshadowed);
+            float sh = luminance(path.directShadowed);
+            path.shadowFactor = (unsh > 0.f) ? saturate(sh / unsh) : 1.0f;
+        }*/
 
         // Russian roulette to terminate paths early.
         if (kUseRussianRoulette)
@@ -1198,6 +1239,11 @@ struct PathTracer
             data.setRadiance(path.L);
 
             outputNRD.sampleRadiance[outIdx] = data;
+        }
+
+        if (kOutputShadowFactor)
+        {
+            sampleShadowFactor[outIdx] = path.shadowFactor;
         }
     }
 };

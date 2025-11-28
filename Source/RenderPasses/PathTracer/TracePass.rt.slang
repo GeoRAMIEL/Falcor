@@ -55,6 +55,11 @@ struct PathPayload
 {
     uint4 packed[5];
 
+    //float3      directUnshadowed;
+    //float       shadowFactor;
+    //float3      directShadowed;
+    uint4 packedShadowInfo[2];    ///< Additional packed data for shadow paths.
+
     PackedHitInfo hit;
     GuideData guideData;
     InteriorList interiorList;  ///< Interior list. Keeping track of a stack of materials with medium properties. The size depends on the config (4B/item).
@@ -78,6 +83,11 @@ struct PathPayload
 
         p.packed[4].xyz = asuint(path.L);
         p.packed[4].w = asuint(path.pdf);
+
+        p.packedShadowInfo[0].xyz = asuint(path.directUnshadowed);
+        p.packedShadowInfo[0].w = asuint(path.shadowFactor);
+        p.packedShadowInfo[1].xyz = asuint(path.directShadowed);
+        p.packedShadowInfo[1].w = 0;
 
         p.hit = path.hit.pack();
         p.guideData = path.guideData;
@@ -106,6 +116,10 @@ struct PathPayload
 
         path.L = asfloat(p.packed[4].xyz);
         path.pdf = asfloat(p.packed[4].w);
+
+        path.directUnshadowed = asfloat(p.packedShadowInfo[0].xyz);
+        path.shadowFactor = asfloat(p.packedShadowInfo[0].w);
+        path.directShadowed = asfloat(p.packedShadowInfo[1].xyz);
 
         path.hit = unpackHitInfo(p.hit);
         path.guideData = p.guideData;

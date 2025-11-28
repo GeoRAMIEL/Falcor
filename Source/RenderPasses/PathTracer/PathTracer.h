@@ -204,4 +204,7 @@ private:
     ref<Buffer>                     mpSampleNRDPrimaryHitNeeOnDelta;///< Compact per-sample NEE on delta primary vertices data.
     ref<Buffer>                     mpSampleNRDEmission;        ///< Compact per-sample NRD emission data.
     ref<Buffer>                     mpSampleNRDReflectance;     ///< Compact per-sample NRD reflectance data.
+
+    ref<Buffer>                     mpSampleShadowFactor;       ///< Compact per-sample shadow factor buffer.
+    bool                            mOutputShadowFactor = false;///< True if shadow factor output is enabled.
 };

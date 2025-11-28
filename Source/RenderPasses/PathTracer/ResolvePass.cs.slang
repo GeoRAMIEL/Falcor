@@ -68,8 +68,12 @@ struct ResolvePass
     RWTexture2D<float4> outputNRDDeltaTransmissionRadianceHitDist;  ///< Output resolved delta transmission radiance in .rgb and hit distance in .a for NRD. Only valid if kOutputNRDData == true.
     RWTexture2D<float4> outputNRDResidualRadianceHitDist;           ///< Output resolved residual radiance in .rgb and hit distance in .a for NRD. Only valid if kOutputNRDData == true.
 
+    StructuredBuffer<float> sampleShadowFactor;               ///< Input per-sample shadow factor.
+    RWTexture2D<float> outputShadowFactor;                    ///< Output resolved shadow factor.
+
     static const bool kOutputGuideData = OUTPUT_GUIDE_DATA;
     static const bool kOutputNRDData = OUTPUT_NRD_DATA;
+    static const bool kOutputShadowFactor = OUTPUT_SHADOW_FACTOR;
 
     /** Entry point for resolve pass.
         \param[in] pixel Pixel coordinates.
@@ -185,6 +189,17 @@ struct ResolvePass
             outputNRDDeltaReflectionRadianceHitDist[pixel] = float4(invSpp * deltaReflectionRadiance, 0.f);
             outputNRDDeltaTransmissionRadianceHitDist[pixel] = float4(invSpp * deltaTransmissionRadiance, 0.f);
             outputNRDResidualRadianceHitDist[pixel] = float4(invSpp * residualRadiance, hitDist);
+        }
+
+        if (kOutputShadowFactor)
+        {
+            float shadowFactor = 0.f;
+            for (uint sampleIdx = 0; sampleIdx < spp; sampleIdx++)
+            {
+                uint idx = offset + sampleIdx;
+                shadowFactor += sampleShadowFactor[idx];
+            }
+            outputShadowFactor[pixel] = invSpp * shadowFactor;
         }
     }
 };

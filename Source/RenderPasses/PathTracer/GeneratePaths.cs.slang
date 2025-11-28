@@ -78,6 +78,9 @@ struct PathGenerator
 
     RWTexture2D<float4> outputColor;                ///< Output color buffer if kSamplesPerPixel == 1.
 
+    RWStructuredBuffer<float> sampleShadowFactor;       ///< Output per-sample shadow factor.
+    RWTexture2D<float> outputShadowFactor;                    ///< Output resolved shadow factor.
+
     // Render settings that depend on the scene.
     // TODO: Move into scene defines.
     static const bool kUseEnvLight = USE_ENV_LIGHT;
@@ -85,6 +88,7 @@ struct PathGenerator
 
     // Additional specialization.
     static const bool kOutputGuideData = OUTPUT_GUIDE_DATA;
+    static const bool kOutputShadowFactor = OUTPUT_SHADOW_FACTOR;
 
     /** Entry point for path generator.
         \param[in] tileID Tile ID in x and y on screen.
@@ -252,6 +256,18 @@ struct PathGenerator
         {
             writeNRDDeltaReflectionGuideBuffers(outputNRD, kUseNRDDemodulation, pixel, 0.f, 0.f, -dir, 0.f, kNRDInvalidPathLength, kNRDInvalidPathLength);
             writeNRDDeltaTransmissionGuideBuffers(outputNRD, kUseNRDDemodulation, pixel, 0.f, 0.f, -dir, 0.f, kNRDInvalidPathLength, 0.f);
+        }
+
+        if (kOutputShadowFactor)
+        {
+            for (uint i = 0; i < spp; i++)
+            {
+                if (kSamplesPerPixel != 1)
+                {
+                    sampleShadowFactor[outIdx + i] = 1.0f;
+                }
+            }
+            outputShadowFactor[pixel] = 1.0f;
         }
     }
 };
