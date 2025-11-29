@@ -122,9 +122,8 @@ void ShadowDepthPass::execute(RenderContext* pRenderContext, const RenderData& r
             ref<const ParameterBlockReflection> pReflection = mDepthPass.pProgram->getReflector()->getParameterBlock(kShadowDepthPassData);
             FALCOR_ASSERT(pReflection);
             mpShadowDepthBlock = ParameterBlock::create(mpDevice, pReflection);
-
-            bindParameterBlock();
         }
+        bindParameterBlock();
 
         mDepthPass.pVars->setParameterBlock(kShadowDepthPassData, mpShadowDepthBlock);
 
