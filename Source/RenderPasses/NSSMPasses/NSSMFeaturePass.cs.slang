@@ -12,6 +12,9 @@ cbuffer PerFrameCB
 Texture2D<float> gShadowDepth;      // Shadow map depth texture
 Texture2D<float> gGBufferDepth;     // Scene depth texture (view-space depth in [0,1])
 Texture2D<float4> gGBufferNormal;   // Scene normal buffer (world-space normal in xyz)
+Texture2D<float2> gLightSpaceShadowDepthStd; // Light Space Shadow Depth Standard Deviation Map
+Texture2D<float> gLightSpacePinholeMap; // Light Space Pinhole Map
+Texture2D<float> gLightSpaceDivergenceMap; // Light Space Divergence Map
 
 RWTexture2D<float4> gShadowMask;    // Output shadow mask texture
 RWTexture2D<float> gCv;             // Dot product of receiver normal and view direction
@@ -21,7 +24,13 @@ RWTexture2D<float> gDistEtoR;       // World-space distance between receiver and
 RWTexture2D<float> gDistVtoR;       // World-space distance between receiver and view point
 RWTexture2D<float> gDistEtoB;       // World-space distance between emitter and blocker
 RWTexture2D<float4> gPosW;          // World position of receiver
+RWTexture2D<float2> gProjectedShadowDepthStd; // Projected Shadow Depth Standard Deviation Map
+RWTexture2D<float> gProjectedPinholeMap; // Projected Pinhole Map
+RWTexture2D<float> gProjectedDivergenceMap; // Projected Divergence Map
 
+// OUTPUT_SHADOW_DEPTH_STD should be defined
+// OUTPUT_PINHOLE_MAP should be defined
+// OUTPUT_DIVERGENCE_MAP should be defined
 
 [numthreads(16, 16, 1)]
 void nssmFeaturePass(uint3 dispatchThreadId: SV_DispatchThreadID)
@@ -83,6 +92,10 @@ void nssmFeaturePass(uint3 dispatchThreadId: SV_DispatchThreadID)
     float distEtoR = length(lightPosW - posW);
     float distVtoR = length(gMainCamera.data.posW - posW);
     float distEtoB = length(lightPosW - posW); // Treat blocker pos as reveiver pos by default
+    float2 projectedShadowDepthStd = 0.0;
+    float projectedPinhole = 0.0;
+    float projectedDivergence = 0.0;
+    // ========================================================
 
     if (lightSpaceUV.x >= 0.0 && lightSpaceUV.x <= 1.0 && lightSpaceUV.y >= 0.0 && lightSpaceUV.y <= 1.0)
     {
@@ -105,6 +118,24 @@ void nssmFeaturePass(uint3 dispatchThreadId: SV_DispatchThreadID)
             distRtoB = length(blockerPosW - posW);
             distEtoB = length(lightPosW - blockerPosW);
         }
+
+        if (OUTPUT_SHADOW_DEPTH_STD == 1)
+        {
+            float2 shadowDepthStd = gLightSpaceShadowDepthStd.Load(int3(lightSpaceUV * shadowDepthDimensions, 0));
+            projectedShadowDepthStd = shadowDepthStd;
+        }
+
+        if (OUTPUT_PINHOLE_MAP == 1)
+        {
+            float pinhole = gLightSpacePinholeMap.Load(int3(lightSpaceUV * shadowDepthDimensions, 0));
+            projectedPinhole = pinhole;
+        }
+
+        if (OUTPUT_DIVERGENCE_MAP == 1)
+        {
+            float divergence = gLightSpaceDivergenceMap.Load(int3(lightSpaceUV * shadowDepthDimensions, 0));
+            projectedDivergence = divergence;
+        }
     }
 
     gShadowMask[pixelPos] = float4(shadow, shadow, distRtoB, 1.0);
@@ -115,4 +146,16 @@ void nssmFeaturePass(uint3 dispatchThreadId: SV_DispatchThreadID)
     gDistVtoR[pixelPos] = distVtoR;
     gDistEtoB[pixelPos] = distEtoB;
     gPosW[pixelPos] = float4(posW, 1.0);
+    if (OUTPUT_SHADOW_DEPTH_STD == 1)
+    {
+        gProjectedShadowDepthStd[pixelPos] = projectedShadowDepthStd;
+    }
+    if (OUTPUT_PINHOLE_MAP == 1)
+    {
+        gProjectedPinholeMap[pixelPos] = projectedPinhole;
+    }
+    if (OUTPUT_DIVERGENCE_MAP == 1)
+    {
+        gProjectedDivergenceMap[pixelPos] = projectedDivergence;
+    }
 }

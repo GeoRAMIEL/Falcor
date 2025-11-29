@@ -9,6 +9,7 @@ const std::string kShadowDepthName = "shadowDepth";
 const std::string kAvgMapName = "avgMap";
 const std::string kStdMapName = "stdMap";
 const std::string kPinholeMapName = "pinholeMap";
+const std::string kDivergenceMapName = "dvgMap";
 // Scripting options.
 const char kMainCamera[] = "mainCamera";
 const char kOutputSize[] = "outputSize";
@@ -26,6 +27,7 @@ ShadowDepthFeatureExtraction::ShadowDepthFeatureExtraction(ref<Device> pDevice, 
     mpAvgState = ComputeState::create(mpDevice);
     mpStdState = ComputeState::create(mpDevice);
     mpPinHoleDetectState = ComputeState::create(mpDevice);
+    mpDivergenceState = ComputeState::create(mpDevice);
 }
 
 Properties ShadowDepthFeatureExtraction::getProperties() const
@@ -57,6 +59,10 @@ RenderPassReflection ShadowDepthFeatureExtraction::reflect(const CompileData& co
         .format(ResourceFormat::R8Unorm)
         .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
         .texture2D(sz.x, sz.y);
+    reflector.addOutput(kDivergenceMapName, "Divergence Map")
+        .format(ResourceFormat::R32Float)
+        .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
+        .texture2D(sz.x, sz.y);
     return reflector;
 }
 
@@ -79,14 +85,16 @@ void ShadowDepthFeatureExtraction::execute(RenderContext* pRenderContext, const 
     auto pAvgMap = renderData.getTexture(kAvgMapName);
     auto pStdMap = renderData.getTexture(kStdMapName);
     auto pPinholeMap = renderData.getTexture(kPinholeMapName);
+    auto pDvgMap = renderData.getTexture(kDivergenceMapName);
 
     // Update frame dimension based on render pass output.
-    FALCOR_ASSERT(pPinholeMap && pAvgMap && pStdMap);
+    FALCOR_ASSERT(pPinholeMap && pAvgMap && pStdMap && pDvgMap);
     updateFrameDim(uint2(pPinholeMap->getWidth(), pPinholeMap->getHeight()));
     // clear target
     pRenderContext->clearUAV(pAvgMap->getUAV().get(), float4(0.f, 0.f, 0.f, 0.f));
     pRenderContext->clearUAV(pStdMap->getUAV().get(), float4(0.f, 0.f, 0.f, 0.f));
     pRenderContext->clearUAV(pPinholeMap->getUAV().get(), float4(0.f, 0.f, 0.f, 0.f));
+    pRenderContext->clearUAV(pDvgMap->getUAV().get(), float4(0.f, 0.f, 0.f, 0.f));
 
     // If there is no scene, clear target and return.
     if (mpScene == nullptr)
@@ -152,6 +160,15 @@ void ShadowDepthFeatureExtraction::execute(RenderContext* pRenderContext, const 
                         SlangCompilerFlags::TreatWarningsAsErrors);
         mpPinHoleDetectVars = ProgramVars::create(mpDevice, mpPinHoleDetectProgram->getReflector());
     }
+    if (!mpDivergenceProgram)
+    {
+        mpDivergenceProgram = Program::createCompute(mpDevice,
+                        kShadowDepthFeatureExtractionProgramFile,
+                        "mainDivergence",
+                        defines,
+                        SlangCompilerFlags::TreatWarningsAsErrors);
+        mpDivergenceVars = ProgramVars::create(mpDevice, mpDivergenceProgram->getReflector());
+    }
 
     // set shader parameters
     auto avgVar = mpAvgVars->getRootVar();
@@ -178,6 +195,13 @@ void ShadowDepthFeatureExtraction::execute(RenderContext* pRenderContext, const 
     pinholeVar["PerFrameCB"]["gInvResolution"] = mInvFrameDim;
     pShadowCam->bindShaderData(pinholeVar["PerFrameCB"]["gShadowCamera"]);
 
+    auto dvgVar = mpDivergenceVars->getRootVar();
+    dvgVar["gShadowDepth"] = pShadowDepthTex;
+    dvgVar["gDvgMap"] = pDvgMap;
+    dvgVar["PerFrameCB"]["gResolution"] = mFrameDim;
+    dvgVar["PerFrameCB"]["gInvResolution"] = mInvFrameDim;
+    pShadowCam->bindShaderData(dvgVar["PerFrameCB"]["gShadowCamera"]);
+
     // dispatch CS
     FALCOR_ASSERT(mpAvgProgram && mpStdProgram && mpPinHoleDetectProgram);
     // Calculate average depth
@@ -192,6 +216,10 @@ void ShadowDepthFeatureExtraction::execute(RenderContext* pRenderContext, const 
     numGroups = div_round_up(uint3(mFrameDim.x, mFrameDim.y, 1u), mpPinHoleDetectProgram->getReflector()->getThreadGroupSize());
     mpPinHoleDetectState->setProgram(mpPinHoleDetectProgram);
     pRenderContext->dispatch(mpPinHoleDetectState.get(), mpPinHoleDetectVars.get(), numGroups);
+    // Divergence map calculation
+    numGroups = div_round_up(uint3(mFrameDim.x, mFrameDim.y, 1u), mpDivergenceProgram->getReflector()->getThreadGroupSize());
+    mpDivergenceState->setProgram(mpDivergenceProgram);
+    pRenderContext->dispatch(mpDivergenceState.get(), mpDivergenceVars.get(), numGroups);
 }
 
 void ShadowDepthFeatureExtraction::renderUI(Gui::Widgets& widget)
@@ -236,6 +264,8 @@ void ShadowDepthFeatureExtraction::recreatePrograms()
     mpStdVars = nullptr;
     mpPinHoleDetectProgram = nullptr;
     mpPinHoleDetectVars = nullptr;
+    mpDivergenceProgram = nullptr;
+    mpDivergenceVars = nullptr;
 }
 
 void ShadowDepthFeatureExtraction::updateFrameDim(const uint2 frameDim)

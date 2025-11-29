@@ -11,6 +11,7 @@ Texture2D<float> gShadowDepth; // Shadow map depth texture
 RWTexture2D<float2> gAvgMap; // Average shadow depth map (in world units)
 RWTexture2D<float2> gStdMap; // shadow depth standard deviation map
 RWTexture2D<float> gPinholeMap; // pinhole detection map
+RWTexture2D<float> gDvgMap; // divergence map
 
 // GATHER_RADIUS should be defined
 
@@ -45,7 +46,7 @@ void mainAvg(uint3 dispatchThreadId: SV_DispatchThreadID)
 
     // Accumulate depth samples in a radius
     float neighborSum = 0.0;
-    uint count = 0;
+    uint neighborCount = 0;
     for (int y = -GATHER_RADIUS; y <= GATHER_RADIUS; ++y)
     {
         for (int x = -GATHER_RADIUS; x <= GATHER_RADIUS; ++x)
@@ -62,12 +63,12 @@ void mainAvg(uint3 dispatchThreadId: SV_DispatchThreadID)
             {
                 float sample = getViewSpaceShadowDepth(gShadowDepth.Load(int3(offsetUV * shadowDepthDimensions, 0)));
                 neighborSum += sample;
-                count++;
+                neighborCount++;
             }
         }
     }
-    float averageNoCenter = neighborSum / count;
-    float averageWithCenter = (neighborSum + centerSample) / (count + 1);
+    float averageNoCenter = neighborSum / neighborCount;
+    float averageWithCenter = (neighborSum + centerSample) / (neighborCount + 1);
     gAvgMap[pixelPos] = float2(averageNoCenter, averageWithCenter);
 }
 
@@ -80,22 +81,17 @@ void mainStd(uint3 dispatchThreadId : SV_DispatchThreadID)
     const uint2 pixelPos = dispatchThreadId.xy;
     const float2 uv = (float2(pixelPos) + 0.5) * gInvResolution;
 
-    // Shadow map dimensions and center sample in view space
     uint2 shadowDepthDimensions;
     gShadowDepth.GetDimensions(shadowDepthDimensions.x, shadowDepthDimensions.y);
-    float centerSample = getViewSpaceShadowDepth(
-        gShadowDepth.Load(int3(uv * shadowDepthDimensions, 0))
-    );
 
     // Read precomputed means: x = mean without center, y = mean with center
     float2 avg = gAvgMap[pixelPos];
     float meanNoCenter   = avg.x;
     float meanWithCenter = avg.y;
 
-    // Accumulate squared deviations
-    float varNoCenter   = 0.0;
-    float varWithCenter = 0.0;
-    uint  count         = 0;
+    // Accumulate variance
+    float neighborVarSum = 0.0;
+    uint neighborCount = 0;
 
     for (int y = -GATHER_RADIUS; y <= GATHER_RADIUS; ++y)
     {
@@ -103,54 +99,37 @@ void mainStd(uint3 dispatchThreadId : SV_DispatchThreadID)
         {
             int2 offset = int2(x, y);
 
-            // Skip center for the “no center” statistic
-            bool isCenter = (x == 0 && y == 0);
+            if (x == 0 && y == 0)
+                continue; // skip center sample
+
+            float distToCenter = length(float2(x, y));
+            if (distToCenter > GATHER_RADIUS)
+                continue; // outside gather radius
 
             float2 offsetUV = uv + float2(offset) / float2(shadowDepthDimensions);
             if (!all(offsetUV >= 0.0) || !all(offsetUV <= 1.0))
                 continue;
 
-            float sample = getViewSpaceShadowDepth(
+            float neighborSample = getViewSpaceShadowDepth(
                 gShadowDepth.Load(int3(offsetUV * shadowDepthDimensions, 0))
             );
 
-            if (!isCenter)
-            {
-                float diffNoCenter = sample - meanNoCenter;
-                varNoCenter += diffNoCenter * diffNoCenter;
-                count++;
-            }
-
-            // For “with center” we include all samples, including the center
-            float diffWithCenter = sample - meanWithCenter;
-            varWithCenter += diffWithCenter * diffWithCenter;
+            float diff = neighborSample - meanNoCenter;
+            neighborVarSum += diff * diff;
+            neighborCount++;
         }
     }
 
-    // Guard against edge cases with no valid neighbors
-    float stdNoCenter   = (count > 0) ? sqrt(varNoCenter / count) : 0.0;
+    float stdNoCenter   = (neighborCount > 0) ? sqrt(neighborVarSum / neighborCount) : 0.0;
 
-    // Number of samples in the full circular neighborhood including center
-    // (same set used when you computed meanWithCenter)
-    uint fullCount = 0;
-    for (int y = -GATHER_RADIUS; y <= GATHER_RADIUS; ++y)
-    {
-        for (int x = -GATHER_RADIUS; x <= GATHER_RADIUS; ++x)
-        {
-            float distToCenter = length(float2(x, y));
-            if (distToCenter > GATHER_RADIUS) continue;
-            fullCount++;
-        }
-    }
-    // Note: varWithCenter was accumulated over the subset that passed UV bounds.
-    // To stay consistent with the mean, you could instead maintain a separate
-    // counter for the with-center path above. Here we assume all offsets are valid.
-    float stdWithCenter = (fullCount > 0) ? sqrt(varWithCenter / fullCount) : 0.0;
+    float centerSample = getViewSpaceShadowDepth(gShadowDepth.Load(int3(uv * shadowDepthDimensions, 0)));
+    float varSumWithCenter = neighborVarSum + (centerSample - meanWithCenter) * (centerSample - meanWithCenter);
+    float stdWithCenter = (neighborCount > 0) ? sqrt(varSumWithCenter / (neighborCount + 1)) : 0.0;
 
     gStdMap[pixelPos] = float2(stdNoCenter, stdWithCenter);
 }
 
-#define PINHOLE_STDDEV_THRESHOLD 0.8f
+#define PINHOLE_STDDEV_THRESHOLD 0.1f
 
 [numthreads(16, 16, 1)]
 void mainPinholeDetect(uint3 dispatchThreadId : SV_DispatchThreadID)
@@ -160,10 +139,8 @@ void mainPinholeDetect(uint3 dispatchThreadId : SV_DispatchThreadID)
     const uint2 pixelPos = dispatchThreadId.xy;
     const float2 uv = (float2(pixelPos) + 0.5) * gInvResolution;
 
-    uint2 shadowDepthDimensions;
-    gShadowDepth.GetDimensions(shadowDepthDimensions.x, shadowDepthDimensions.y);
-    float centerSample = getViewSpaceShadowDepth(gShadowDepth.Load(int3(uv * shadowDepthDimensions, 0)));
-    if (centerSample == 0.0 || centerSample == 1.0)
+    float rawDepth = gShadowDepth.Load(int3(pixelPos, 0));
+    if (rawDepth == 0.0 || rawDepth == 1.0)
     {
         gPinholeMap[pixelPos] = 0.0;
         return;
@@ -178,8 +155,8 @@ void mainPinholeDetect(uint3 dispatchThreadId : SV_DispatchThreadID)
     float stdNoCenter = std.x;
     float stdWithCenter = std.y;
 
-    stdNoCenter = stdNoCenter / (meanNoCenter + 1e-5);
-    stdWithCenter = stdWithCenter / (meanWithCenter + 1e-5);
+    //stdNoCenter = stdNoCenter / (meanNoCenter + 1e-5);
+    //stdWithCenter = stdWithCenter / (meanWithCenter + 1e-5);
 
     // Pinhole detection criterion:
     // Standard deviation including center is high (indicating discontinuity)
@@ -193,4 +170,52 @@ void mainPinholeDetect(uint3 dispatchThreadId : SV_DispatchThreadID)
     {
         gPinholeMap[pixelPos] = 0.0;
     }
+    /*float pinholeResponse = saturate((stdWithCenter - PINHOLE_STDDEV_THRESHOLD) / PINHOLE_STDDEV_THRESHOLD) *
+                            saturate((PINHOLE_STDDEV_THRESHOLD - stdNoCenter) / PINHOLE_STDDEV_THRESHOLD);*/
+}
+
+#define DVG_MAX 2.0f
+[numthreads(16, 16, 1)]
+void mainDivergence(uint3 dispatchThreadId : SV_DispatchThreadID)
+{
+    if (any(dispatchThreadId.xy >= gResolution))
+        return;
+    const int2 pixelPos = dispatchThreadId.xy;
+    const float2 uv = (float2(pixelPos) + 0.5) * gInvResolution;
+    int2 shadowDepthDimensions;
+    gShadowDepth.GetDimensions(shadowDepthDimensions.x, shadowDepthDimensions.y);
+    
+    float rawDepth = gShadowDepth.Load(int3(pixelPos, 0));
+    if (rawDepth == 0.0 || rawDepth == 1.0)
+    {
+        gDvgMap[pixelPos] = 0.0;
+        return;
+    }
+    float centerSample = getViewSpaceShadowDepth(rawDepth);
+
+    float divergence = 0.0;
+    int neighborCount = 0;
+    for (int y = -1; y <= 1; ++y)
+    {
+        for (int x = -1; x <= 1; ++x)
+        {
+            if (x == 0 && y == 0)
+                continue; // skip center sample
+            int2 offset = int2(x, y);
+            int2 neighborPixelPos = dispatchThreadId.xy + int2(offset);
+            if (any(neighborPixelPos < 0) || any(neighborPixelPos >= int2(gResolution)))
+            {
+                continue; // outside texture bounds
+            }
+            else
+            {
+                float sample = getViewSpaceShadowDepth(gShadowDepth.Load(int3(neighborPixelPos, 0)));
+                divergence += abs(sample - centerSample);
+                neighborCount++;
+            }
+        }
+    }
+    divergence = divergence / neighborCount;
+    divergence = saturate(divergence / DVG_MAX);
+    gDvgMap[pixelPos] = divergence;
 }

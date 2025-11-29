@@ -1,7 +1,8 @@
 #SCENE_PATH=/workspace/develop/Falcor/media/test_scenes/cornell_box_bunny.pyscene
 #SCENE_PATH=/workspace/develop/Falcor/media/test_scenes/grey_and_white_room/grey_and_white_room.pyscene
 #SCENE_PATH=/workspace/develop/Falcor/media/Arcade/Arcade.pyscene
-SCENE_PATH=/workspace/develop/Falcor/dappled_light_data_gen/test_scenes/cornell_box_bunny.pyscene
+#SCENE_PATH=/workspace/develop/Falcor/dappled_light_data_gen/test_scenes/garden_1.pyscene
+SCENE_PATH=/workspace/develop/falcor_scenes/EmeraldSquare_v4_1/EmeraldSquare_Day_v1.pyscene
 
 SHADER_CACHE_PATH=/workspace/develop/Falcor/dappled_light_data_gen/shader_cache
 
@@ -11,7 +12,8 @@ MOGWAI_LOG_VERBOSITY=2
 echo "<<<<< Test run started at: $(date) >>>>>"
 
 # Generate feature images
-Mogwai --headless --script=test_pinhole_detection.py --deferred --scene=$SCENE_PATH --width=2048 --height=1024 --verbosity=$MOGWAI_LOG_VERBOSITY --shadercache=$SHADER_CACHE_PATH --use-cache
+#Mogwai --headless --script=test_pinhole_detection.py --deferred --scene=$SCENE_PATH --width=2048 --height=1024 --verbosity=$MOGWAI_LOG_VERBOSITY --shadercache=$SHADER_CACHE_PATH --use-cache
+Mogwai --headless --script=test_pinhole_detection.py --deferred --scene=$SCENE_PATH --width=2048 --height=1024 --verbosity=$MOGWAI_LOG_VERBOSITY
 echo "Feature images generated."
 
 # print end time

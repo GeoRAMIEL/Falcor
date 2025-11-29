@@ -65,4 +65,9 @@ private:
     ref<Program> mpPinHoleDetectProgram; // pinhole detection program
     ref<ProgramVars> mpPinHoleDetectVars;
     ref<ComputeState> mpPinHoleDetectState;
+
+    ref<Program> mpDivergenceProgram; // divergence map program
+    ref<ProgramVars> mpDivergenceVars;
+    ref<ComputeState> mpDivergenceState;
+    
 };

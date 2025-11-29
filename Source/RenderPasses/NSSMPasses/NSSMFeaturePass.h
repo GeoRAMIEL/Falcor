@@ -57,4 +57,8 @@ private:
     ref<Program> mpProgram;
     ref<ProgramVars> mpVars;
     ref<ComputeState> mpState;
+
+    bool mOutputShadowDepthStd = false;
+    bool mOutputPinholeMap = false;
+    bool mOutputDivergenceMap = false;
 };

@@ -9,6 +9,9 @@ const std::string kNSSMFeaturePassProgramFile = "RenderPasses/NSSMPasses/NSSMFea
 const std::string kShadowDepthName = "shadowDepth";
 const std::string kGBufferDepthName = "GBufferDepth";
 const std::string kGBufferNormalName = "GBufferNormal";
+const std::string kLightSpaceShadowDepthStdName = "lightSpaceShadowDepthStd";
+const std::string kLightSpacePinholeMapName = "lightSpacePinholeMap";
+const std::string kLightSpaceDivergenceMapName = "lightSpaceDivergenceMap";
 // Output names
 const std::string kShadowMaskName = "shadowMask"; // R, G: shadow mask, B: distRtoB
 const std::string kCvName = "cv"; // N dot V
@@ -18,6 +21,9 @@ const std::string kDistEtoR = "distEtoR"; // Receiver to emitter distance
 const std::string kDistVtoR = "distVtoR"; // Receiver to view point distance
 const std::string kDistEtoB = "distEtoB"; // Emitter to blocker distance
 const std::string kPosW = "posW"; // World position of receiver
+const std::string kProjectedShadowDepthStdName = "projectedShadowDepthStd";
+const std::string kProjectedPinholeMapName = "projectedPinholeMap";
+const std::string kProjectedDivergenceMapName = "projectedDivergenceMap";
 
 // Scripting options.
 const char kShadowCamera[] = "shadowCamera";
@@ -53,6 +59,15 @@ RenderPassReflection NSSMFeaturePass::reflect(const CompileData& compileData)
         .bindFlags(ResourceBindFlags::ShaderResource);
     reflector.addInput(kGBufferNormalName, "G-Buffer Normal buffer")
         .bindFlags(ResourceBindFlags::ShaderResource);
+    reflector.addInput(kLightSpaceShadowDepthStdName, "Light Space Shadow Depth Standard Deviation Map")
+        .bindFlags(ResourceBindFlags::ShaderResource)
+        .flags(RenderPassReflection::Field::Flags::Optional);
+    reflector.addInput(kLightSpacePinholeMapName, "Light Space Pinhole Map")
+        .bindFlags(ResourceBindFlags::ShaderResource)
+        .flags(RenderPassReflection::Field::Flags::Optional);
+    reflector.addInput(kLightSpaceDivergenceMapName, "Light Space Divergence Map")
+        .bindFlags(ResourceBindFlags::ShaderResource)
+        .flags(RenderPassReflection::Field::Flags::Optional);
 
     reflector.addOutput(kShadowMaskName, "Shadow mask")
         .format(ResourceFormat::RGBA32Float)
@@ -93,6 +108,24 @@ RenderPassReflection NSSMFeaturePass::reflect(const CompileData& compileData)
         .format(ResourceFormat::RGBA32Float)
         .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
         .texture2D(sz.x, sz.y);
+    
+    reflector.addOutput(kProjectedShadowDepthStdName, "Projected Shadow Depth Standard Deviation Map")
+        .format(ResourceFormat::RG32Float)
+        .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
+        .texture2D(sz.x, sz.y)
+        .flags(RenderPassReflection::Field::Flags::Optional);
+
+    reflector.addOutput(kProjectedPinholeMapName, "Projected Pinhole Map")
+        .format(ResourceFormat::R32Float)
+        .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
+        .texture2D(sz.x, sz.y)
+        .flags(RenderPassReflection::Field::Flags::Optional);
+    
+    reflector.addOutput(kProjectedDivergenceMapName, "Projected Divergence Map")
+        .format(ResourceFormat::R32Float)
+        .bindFlags(ResourceBindFlags::UnorderedAccess | ResourceBindFlags::ShaderResource)
+        .texture2D(sz.x, sz.y)
+        .flags(RenderPassReflection::Field::Flags::Optional);
 
     return reflector;
 }
@@ -111,6 +144,9 @@ void NSSMFeaturePass::execute(RenderContext* pRenderContext, const RenderData& r
     auto pShadowDepthTex = renderData.getTexture(kShadowDepthName);
     auto pGBufferDepthTex = renderData.getTexture(kGBufferDepthName);
     auto pGBufferNormalTex = renderData.getTexture(kGBufferNormalName);
+    auto pLightSpaceShadowDepthStdTex = renderData.getTexture(kLightSpaceShadowDepthStdName);
+    auto pLightSpacePinholeMapTex = renderData.getTexture(kLightSpacePinholeMapName);
+    auto pLightSpaceDivergenceMapTex = renderData.getTexture(kLightSpaceDivergenceMapName);
 
     auto pShadowMaskTex = renderData.getTexture(kShadowMaskName);
     auto pCvTex = renderData.getTexture(kCvName);
@@ -120,6 +156,13 @@ void NSSMFeaturePass::execute(RenderContext* pRenderContext, const RenderData& r
     auto pDistVtoRTex = renderData.getTexture(kDistVtoR);
     auto pDistEtoBTex = renderData.getTexture(kDistEtoB);
     auto pPosWTex = renderData.getTexture(kPosW);
+    auto pProjectedShadowDepthStdTex = renderData.getTexture(kProjectedShadowDepthStdName);
+    auto pProjectedPinholeMapTex = renderData.getTexture(kProjectedPinholeMapName);
+    auto pProjectedDivergenceMapTex = renderData.getTexture(kProjectedDivergenceMapName);
+
+    mOutputShadowDepthStd = (pProjectedShadowDepthStdTex != nullptr);
+    mOutputPinholeMap = (pProjectedPinholeMapTex != nullptr);
+    mOutputDivergenceMap = (pProjectedDivergenceMapTex != nullptr);
 
     // Update frame dimension based on render pass output.
     FALCOR_ASSERT(pShadowMaskTex);
@@ -135,6 +178,18 @@ void NSSMFeaturePass::execute(RenderContext* pRenderContext, const RenderData& r
     pRenderContext->clearUAV(pDistVtoRTex->getUAV().get(), float4(0.f));
     pRenderContext->clearUAV(pDistEtoBTex->getUAV().get(), float4(0.f));
     pRenderContext->clearUAV(pPosWTex->getUAV().get(), float4(0.f));
+    if (mOutputShadowDepthStd)
+    {
+        pRenderContext->clearUAV(pProjectedShadowDepthStdTex->getUAV().get(), float4(0.f));
+    }
+    if (mOutputPinholeMap)
+    {
+        pRenderContext->clearUAV(pProjectedPinholeMapTex->getUAV().get(), float4(0.f));
+    }
+    if (mOutputDivergenceMap)
+    {
+        pRenderContext->clearUAV(pProjectedDivergenceMapTex->getUAV().get(), float4(0.f));
+    }
 
     // If there is no scene, just return.
     if (mpScene == nullptr)
@@ -151,19 +206,32 @@ void NSSMFeaturePass::execute(RenderContext* pRenderContext, const RenderData& r
     // Create compute program.
     if (!mpProgram)
     {
+        DefineList programDefines;
+        programDefines.add(mpScene->getSceneDefines());
+        programDefines.add("OUTPUT_SHADOW_DEPTH_STD", mOutputShadowDepthStd ? "1" : "0");
+        programDefines.add("OUTPUT_PINHOLE_MAP", mOutputPinholeMap ? "1" : "0");
+        programDefines.add("OUTPUT_DIVERGENCE_MAP", mOutputDivergenceMap ? "1" : "0");
         mpProgram = Program::createCompute(mpDevice,
                         kNSSMFeaturePassProgramFile,
                         "nssmFeaturePass",
-                        mpScene->getSceneDefines(),
+                        programDefines,
                         SlangCompilerFlags::TreatWarningsAsErrors);
         mpVars = ProgramVars::create(mpDevice, mpProgram->getReflector());
     }
+    mpProgram->addDefine("OUTPUT_SHADOW_DEPTH_STD", mOutputShadowDepthStd ? "1" : "0");
+    mpProgram->addDefine("OUTPUT_PINHOLE_MAP", mOutputPinholeMap ? "1" : "0");
+    mpProgram->addDefine("OUTPUT_DIVERGENCE_MAP", mOutputDivergenceMap ? "1" : "0");
 
     // Set shader parameters.
     auto var = mpVars->getRootVar();
+    // Input textures
     var["gShadowDepth"] = pShadowDepthTex;
     var["gGBufferDepth"] = pGBufferDepthTex;
     var["gGBufferNormal"] = pGBufferNormalTex;
+    var["gLightSpaceShadowDepthStd"] = pLightSpaceShadowDepthStdTex;
+    var["gLightSpacePinholeMap"] = pLightSpacePinholeMapTex;
+    var["gLightSpaceDivergenceMap"] = pLightSpaceDivergenceMapTex;
+    // Output textures
     var["gShadowMask"] = pShadowMaskTex;
     var["gCv"] = pCvTex;
     var["gCe"] = pCeTex;
@@ -172,6 +240,19 @@ void NSSMFeaturePass::execute(RenderContext* pRenderContext, const RenderData& r
     var["gDistVtoR"] = pDistVtoRTex;
     var["gDistEtoB"] = pDistEtoBTex;
     var["gPosW"] = pPosWTex;
+    if (mOutputShadowDepthStd)
+    {
+        var["gProjectedShadowDepthStd"] = pProjectedShadowDepthStdTex;
+    }
+    if (mOutputPinholeMap)
+    {
+        var["gProjectedPinholeMap"] = pProjectedPinholeMapTex;
+    }
+    if (mOutputDivergenceMap)
+    {
+        var["gProjectedDivergenceMap"] = pProjectedDivergenceMapTex;
+    }
+    // Other parameters
     var["PerFrameCB"]["gResolution"] = mFrameDim;
     var["PerFrameCB"]["gInvResolution"] = mInvFrameDim;
 
