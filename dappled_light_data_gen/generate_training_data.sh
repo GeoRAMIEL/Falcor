@@ -9,8 +9,8 @@ MOGWAI_LOG_VERBOSITY=2
 echo "<<<<< Test run started at: $(date) >>>>>"
 
 # Generate feature images
-#Mogwai --headless --script=network_feature_gen.py --deferred --scene=$SCENE_PATH --width=2048 --height=1024 --verbosity=$MOGWAI_LOG_VERBOSITY
-#echo "Feature images generated."
+Mogwai --headless --script=network_feature_gen.py --deferred --scene=$SCENE_PATH --width=2048 --height=1024 --verbosity=$MOGWAI_LOG_VERBOSITY
+echo "Feature images generated."
 
 # Render ray-traced ground truth
 Mogwai --headless --script=ground_truth_render.py --deferred --scene=$SCENE_PATH --width=2048 --height=1024 --verbosity=$MOGWAI_LOG_VERBOSITY

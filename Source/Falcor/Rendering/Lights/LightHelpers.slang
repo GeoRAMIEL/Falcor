@@ -163,7 +163,7 @@ bool sampleDistantLight(const float3 shadingPosW, const LightData light, const f
     // A distant light doesn't have a position. Just clear to zero.
     ls.posW = float3(0.f, 0.f, 0.f);
 
-    float cosAngle = 0.9999;//0.9999893f; // force to 0.265 degrees for sun, values aren't being passed through correctly
+    float cosAngle = 0.9999893f; // force to 0.265 degrees for sun, values aren't being passed through correctly
     //float cosAngle = light.cosSubtendedAngle;
 
     // Sample direction.
