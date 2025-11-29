@@ -3,6 +3,7 @@ add_plugin(NSSMPasses)
 target_sources(NSSMPasses PRIVATE
     ShadowDepth.3d.slang
     ShadowProjection.cs.slang
+    ShadowDepthFeatureExtraction.cs.slang
     NSSMFeaturePass.cs.slang
     ShadowDepthPass.cpp
     ShadowDepthPass.h
@@ -11,6 +12,8 @@ target_sources(NSSMPasses PRIVATE
     NSSMFeaturePass.cpp
     NSSMFeaturePass.h
     NSSMPasses.cpp
+    ShadowDepthFeatureExtraction.cpp
+    ShadowDepthFeatureExtraction.h
 )
 
 target_copy_shaders(NSSMPasses RenderPasses/NSSMPasses)
