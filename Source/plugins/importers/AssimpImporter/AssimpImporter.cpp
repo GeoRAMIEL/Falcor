@@ -1181,11 +1181,11 @@ void importInternal(const void* buffer, size_t byteSize, const std::filesystem::
     createAnimations(data, importMode);
     timeReport.measure("Creating animations");
 
-    createCameras(data, importMode);
+    /*createCameras(data, importMode);
     timeReport.measure("Creating cameras");
 
     createLights(data);
-    timeReport.measure("Creating lights");
+    timeReport.measure("Creating lights");*/
 
     timeReport.printToLog();
 }
