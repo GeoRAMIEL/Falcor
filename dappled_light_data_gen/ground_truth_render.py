@@ -3,9 +3,9 @@ from falcor.falcor_ext import RenderGraph, createPass, renderFrame
 
 def render_graph_PathTracer():
     g = RenderGraph("PathTracer")
-    PathTracer = createPass("PathTracer", {'samplesPerPixel': 32})
+    PathTracer = createPass("PathTracer", {'samplesPerPixel': 64})
     g.addPass(PathTracer, "PathTracer")
-    VBufferRT = createPass("VBufferRT", {'samplePattern': 'Stratified', 'sampleCount': 32, 'useAlphaTest': True})
+    VBufferRT = createPass("VBufferRT", {'samplePattern': 'Stratified', 'sampleCount': 64, 'useAlphaTest': True})
     g.addPass(VBufferRT, "VBufferRT")
     AccumulatePass = createPass("AccumulatePass", {'enabled': True, 'precisionMode': 'Single'})
     g.addPass(AccumulatePass, "AccumulatePass")
@@ -32,7 +32,7 @@ except NameError: None
 m.frameCapture.outputDir = "/workspace/develop/Falcor/dappled_light_data_gen/mogwai_renders"
 m.frameCapture.baseFilename = "Mogwai"
 
-m.clock.exitFrame = 2
+m.clock.exitFrame = 100
 m.frameCapture.addFrames(m.activeGraph, [1])
 
 def onSceneUpdate(scene, time):
