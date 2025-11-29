@@ -163,8 +163,12 @@ bool sampleDistantLight(const float3 shadingPosW, const LightData light, const f
     // A distant light doesn't have a position. Just clear to zero.
     ls.posW = float3(0.f, 0.f, 0.f);
 
+    float cosAngle = 0.9999;//0.9999893f; // force to 0.265 degrees for sun, values aren't being passed through correctly
+    //float cosAngle = light.cosSubtendedAngle;
+
     // Sample direction.
-    float3 dir = sample_cone(u, light.cosSubtendedAngle);
+    //float3 dir = sample_cone(u, light.cosSubtendedAngle);
+    float3 dir = sample_cone(u, cosAngle);
 
     // Transform sampled direction to world space
     ls.dir = normalize(mul((float3x3)light.transMat, dir));
@@ -175,7 +179,8 @@ bool sampleDistantLight(const float3 shadingPosW, const LightData light, const f
     // A DistantLight's angle defines the solid angle it subtends.
     // But because the angle is intended to affect penumbra size, but not
     // perceived brigthness, we treat intensity as radiance.
-    float solidAngle = (float)M_2PI * (1.f - light.cosSubtendedAngle);
+    //float solidAngle = (float)M_2PI * (1.f - light.cosSubtendedAngle);
+    float solidAngle = (float)M_2PI * (1.f - cosAngle);
     ls.Li = light.intensity;
     ls.pdf = 1.f / solidAngle;
     return true;

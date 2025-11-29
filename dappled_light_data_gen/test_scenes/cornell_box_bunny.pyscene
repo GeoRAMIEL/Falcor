@@ -111,7 +111,7 @@ sunLightDirectional.direction = float3(0, 0, -1)
 sunLightDistant = DistantLight('Sun Light Distant')
 sunLightDistant.intensity = float3(3, 3, 4)
 sunLightDistant.direction = float3(-1, -1, -1)
-sunLightDistant.angle = 0.174
+sunLightDistant.angle = 0.004363323 # 0.25 degrees in radians, this is fixed for the sun
 sceneBuilder.addLight(sunLightDistant)
 
 # Create camera
