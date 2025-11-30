@@ -143,7 +143,7 @@ void AccumulatePass::execute(RenderContext* pRenderContext, const RenderData& re
             auto sceneUpdates = mpScene->getUpdates();
             if ((sceneUpdates & ~IScene::UpdateFlags::CameraPropertiesChanged) != IScene::UpdateFlags::None)
             {
-                reset();
+                //reset();
             }
             if (is_set(sceneUpdates, IScene::UpdateFlags::CameraPropertiesChanged))
             {
@@ -374,6 +374,7 @@ void AccumulatePass::setEnabled(bool enabled)
 
 void AccumulatePass::reset()
 {
+    //return;
     mFrameCount = 0;
 }
 
