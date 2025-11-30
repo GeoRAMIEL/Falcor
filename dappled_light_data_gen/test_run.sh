@@ -11,14 +11,14 @@ MOGWAI_LOG_VERBOSITY=2
 echo "<<<<< Test run started at: $(date) >>>>>"
 
 # Generate feature images
-Mogwai --headless --script=test_mogwai.py --deferred --scene=$SCENE_PATH --width=2048 --height=1024 --verbosity=$MOGWAI_LOG_VERBOSITY --shadercache=$SHADER_CACHE_PATH --use-cache
+Mogwai --headless --script=test_mogwai.py --deferred --scene=$SCENE_PATH --width=2048 --height=1024 --verbosity=$MOGWAI_LOG_VERBOSITY
 echo "Feature images generated."
 # Render ray-traced ground truth
-Mogwai --headless --script=ground_truth_render.py --deferred --scene=$SCENE_PATH --width=2048 --height=1024 --verbosity=$MOGWAI_LOG_VERBOSITY --shadercache=$SHADER_CACHE_PATH --use-cache
-echo "Ray-traced ground truth rendered."
+#Mogwai --headless --script=ground_truth_render.py --deferred --scene=$SCENE_PATH --width=2048 --height=1024 --verbosity=$MOGWAI_LOG_VERBOSITY --shadercache=$SHADER_CACHE_PATH --use-cache
+#echo "Ray-traced ground truth rendered."
 # Convert renders to KPNSM format
-python3 convert_renders_to_kpnsm_format.py --input_folder=mogwai_renders --output_folder=kpnsm_format
-echo "Renders converted to KPNSM format."
+#python3 convert_renders_to_kpnsm_format.py --input_folder=mogwai_renders --output_folder=kpnsm_format
+#echo "Renders converted to KPNSM format."
 
 # print end time
 echo "<<<<< Test run ended at: $(date) >>>>>"

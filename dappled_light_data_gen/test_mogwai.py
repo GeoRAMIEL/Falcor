@@ -33,7 +33,8 @@ def render_graph_PathTracer():
     g.addEdge("VBufferRT.mvec", "PathTracer.mvec")
     g.addEdge("PathTracer.color", "AccumulatePass.input")
     g.addEdge("AccumulatePass.output", "ToneMapper.src")
-    g.markOutput("ToneMapper.dst")
+    #g.markOutput("ToneMapper.dst")
+    g.markOutput("PathTracer.shadowFactor")
     return g
 
 def render_graph_BSDFViewer():
@@ -104,10 +105,10 @@ def render_graph_sun_shadow_map():
 #except NameError: None
 
 #test_graph = render_graph_MinimalPathTracer()
-#test_graph = render_graph_PathTracer()
+test_graph = render_graph_PathTracer()
 #test_graph = render_graph_BSDFViewer()
 #test_graph = render_graph_SceneDebugger()
-test_graph = render_graph_test()
+#test_graph = render_graph_test()
 try: m.addGraph(test_graph)
 except NameError: None
 

@@ -283,8 +283,8 @@ struct PathTracer
         path.thp = float3(1.f);
 
         path.shadowFactor = 0.0f;
-        path.directUnshadowed = float3(0.f);
-        path.directShadowed = float3(0.f);
+        path.directUnshadowed = 0.0f;
+        path.directShadowed = 0.0f;
 
         const uint2 pixel = path.getPixel();
 
@@ -1002,48 +1002,50 @@ struct PathTracer
 
                 float3 weight = mi.eval(sd, ls.dir, path.sg);
                 float3 Lr = weight * ls.Li;
-                // Treat back-facing directions as fully shadowed.
-                /*float NdotL = dot(sd.getOrientedFaceNormal(), ls.dir);
-                if (NdotL <= 0.f)
-                {
-                    if (path.getVertexIndex() == 1)
-                    {
-                        // We consider this a “potential” contribution that is fully shadowed.
-                        path.directUnshadowed += Lr;
-                        // Do NOT add to directShadowed or to path.L.
-                    }
-                    // Skip visibility ray entirely.
-                }
-                else */
+                
                 if (any(Lr > 0.f))
                 {
-                    Ray ray = ls.getVisibilityRay();
+                    float NdotL = dot(sd.getOrientedFaceNormal(), ls.dir);
 
-
-                    if (isCurvePolyTubeHit)
+                    // For primary vertex, we’ll use luminance(Lr) as a weight for the visibility ratio.
+                    if (path.getVertexIndex() == 1 && NdotL > 0.f)
                     {
-                        // For curves tessellated into poly-tubes, we make sure that the origin is on the same side as light
-                        // so there is no self-shadowing (transmission lobe of hair BSDF takes care of that).
-                        if (dot(sd.frame.N, ray.dir) < 0.f)
+                        Ray ray = ls.getVisibilityRay();
+
+                        if (isCurvePolyTubeHit)
                         {
-                            ray.origin = ray.origin - sd.frame.N * sd.curveRadius * 2.1f;
+                            if (dot(sd.frame.N, ray.dir) < 0.f)
+                            {
+                                ray.origin = ray.origin - sd.frame.N * sd.curveRadius * 2.1f;
+                            }
+                        }
+
+                        logTraceRay(PixelStatsRayType::Visibility);
+                        bool visible = vq.traceVisibilityRay(ray);
+
+                        // Radiance weight for visibility ratio.
+                        float w = luminance(Lr);
+
+                        // Accumulate "would-be" direct lighting and the visible part.
+                        path.directUnshadowed += w;
+                        if (visible)
+                        {
+                            path.directShadowed += w;
+                            addToPathContribution(path, Lr);
                         }
                     }
-
-                    if (path.getVertexIndex() == 1)
+                    else
                     {
-                        path.directUnshadowed += Lr; // expected contrib if visible
-                    }
-                    logTraceRay(PixelStatsRayType::Visibility);
-                    bool visible = vq.traceVisibilityRay(ray);
-                    if (visible)
-                    {
-                        if (path.getVertexIndex() == 1)
+                        // Non-primary vertices: just do normal direct lighting.
+                        bool visible = true;
+                        if (NdotL > 0.f)
                         {
-                            path.shadowFactor = 1.0f;
-                            //path.directShadowed += Lr;
+                            Ray ray = ls.getVisibilityRay();
+                            logTraceRay(PixelStatsRayType::Visibility);
+                            visible = vq.traceVisibilityRay(ray);
                         }
-                        addToPathContribution(path, Lr);
+                        if (visible)
+                            addToPathContribution(path, Lr);
                     }
                 }
             }
@@ -1243,7 +1245,8 @@ struct PathTracer
 
         if (kOutputShadowFactor)
         {
-            sampleShadowFactor[outIdx] = path.shadowFactor;
+            float sf = path.directUnshadowed > 0.0f ? path.directShadowed / path.directUnshadowed : 0.0f;
+            sampleShadowFactor[outIdx] = sf;
         }
     }
 };
