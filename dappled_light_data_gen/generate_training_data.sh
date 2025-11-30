@@ -5,14 +5,13 @@ SHADER_CACHE_PATH=/workspace/develop/Falcor/dappled_light_data_gen/shader_cache
 
 MOGWAI_LOG_VERBOSITY=2
 
-# print start time
-echo "<<<<< Test run started at: $(date) >>>>>"
-
 # Generate feature images
+echo "<<<<< Starting feature image generation at: $(date) >>>>>"
 Mogwai --headless --script=network_feature_gen.py --deferred --scene=$SCENE_PATH --width=2048 --height=1024 --verbosity=$MOGWAI_LOG_VERBOSITY
 echo "Feature images generated."
 
 # Render ray-traced ground truth
+echo "<<<<< Starting ray-traced ground truth rendering at: $(date) >>>>>"
 Mogwai --headless --script=ground_truth_render.py --deferred --scene=$SCENE_PATH --width=2048 --height=1024 --verbosity=$MOGWAI_LOG_VERBOSITY
 echo "Ray-traced ground truth rendered."
 
@@ -21,4 +20,4 @@ echo "Ray-traced ground truth rendered."
 #echo "Renders converted to KPNSM format."
 
 # print end time
-echo "<<<<< Test run ended at: $(date) >>>>>"
+echo "<<<<< Data generation finished at: $(date) >>>>>"

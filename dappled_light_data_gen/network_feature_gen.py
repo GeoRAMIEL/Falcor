@@ -4,6 +4,7 @@ import random
 import math
 import json
 from randomization_applier import apply_randomization
+import tqdm
 
 def render_graph_test():
     g = RenderGraph("test_graph")
@@ -64,22 +65,29 @@ m.frameCapture.addFrames(m.activeGraph, range(1, framesToGen + 1))
 
 frameIndex = 0
 
+progress_bar = tqdm.tqdm(
+    total=framesToGen,
+    desc="feature group rendered")
+
 def onSceneUpdate(scene, time):
     global frameIndex
     if frameIndex == 0:
         frameIndex += 1
         return
-    print(f"======== onSceneUpdate called. time={time}. ========")
+    #print(f"======== onSceneUpdate called. time={time}. ========")
     
     settingIndex = frameIndex - 1
     if settingIndex >= len(randomization_settings):
         print(f"No more randomization settings available for frameIndex={frameIndex}, settingIndex={settingIndex}")
         frameIndex += 1
+        progress_bar.update(1)
         return
     
     apply_randomization(scene, randomization_settings, settingIndex)
 
     frameIndex += 1
+
+    progress_bar.update(1)
 
 
 m.sceneUpdateCallback = onSceneUpdate

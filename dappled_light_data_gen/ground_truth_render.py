@@ -4,6 +4,7 @@ import random
 import math
 import json
 from randomization_applier import apply_randomization
+import tqdm
 
 ENABLE_COLOR_RENDER = False
 
@@ -61,6 +62,10 @@ m.frameCapture.addFrames(m.activeGraph, range(accumulation_frames, accumulation_
 
 frameIndex = 0
 
+progress_bar = tqdm.tqdm(
+    total=framesToGen,
+    desc="gt images rendered")
+
 def onSceneUpdate(scene, time):
     global frameIndex
     # only update on frame 1, accumulation_frames+1, 2*accumulation_frames+1, ..., N*accumulation_frames+1
@@ -68,19 +73,23 @@ def onSceneUpdate(scene, time):
         frameIndex += 1
         return
 
-    print(f"======== onSceneUpdate called. time={time}. ========")
+    #print(f"======== onSceneUpdate called. time={time}. ========")
 
     settingIndex = (frameIndex - 1) // accumulation_frames - 1 # delay randomization loading by 1
     if settingIndex < 0:
         frameIndex += 1
+        progress_bar.update(1)
         return
     if settingIndex >= len(randomization_settings):
         print(f"No more randomization settings available for frameIndex={frameIndex}, settingIndex={settingIndex}")
         frameIndex += 1
+        progress_bar.update(1)
         return
     apply_randomization(scene, randomization_settings, settingIndex)
     
     frameIndex += 1
+
+    progress_bar.update(1)
 
 m.sceneUpdateCallback = onSceneUpdate
 
