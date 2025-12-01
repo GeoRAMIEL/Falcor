@@ -8,6 +8,11 @@ import tqdm
 
 ENABLE_COLOR_RENDER = False
 
+IS_TEST_RUN = False
+#IS_TEST_RUN = True
+#GENERATE_FOR_TRAINING = True
+GENERATE_FOR_TRAINING = False
+
 def render_graph_PathTracer():
     g = RenderGraph("PathTracer")
     PathTracer = createPass("PathTracer", {'samplesPerPixel': 64, 'maxSurfaceBounces': 0, 'maxDiffuseBounces': 0, 'maxSpecularBounces': 0, 'maxTransmissionBounces': 0})
@@ -44,17 +49,34 @@ test_graph = render_graph_PathTracer()
 try: m.addGraph(test_graph)
 except NameError: None
 
-m.frameCapture.outputDir = "/workspace/develop/falcor_scenes/mogwai_gt_renders"
-#m.frameCapture.outputDir = "/data/mogwai_gt_renders"
+if IS_TEST_RUN:
+    m.frameCapture.outputDir = "/workspace/develop/falcor_scenes/mogwai_gt_renders"
+else:
+    if GENERATE_FOR_TRAINING:
+        m.frameCapture.outputDir = "/data/nssm_data/train/mogwai_gt_renders"
+    else:
+        m.frameCapture.outputDir = "/data/nssm_data/validation/mogwai_gt_renders"
 m.frameCapture.baseFilename = "Mogwai"
+print(f"Output folder set to: {m.frameCapture.outputDir}")
 
 # load randomization settings
-randomizaiton_file_path = "/workspace/develop/falcor_scenes/EmeraldSquare_v4_1/randomization_settings.json"
+randomizaiton_file_path = "/no/path/rnd.json"
+if GENERATE_FOR_TRAINING:
+    # For training
+    randomizaiton_file_path = "/workspace/develop/Falcor/dappled_light_data_gen/randomization_settings_train.json"
+else:
+    # For validation
+    randomizaiton_file_path = "/workspace/develop/Falcor/dappled_light_data_gen/randomization_settings_val.json"
 with open(randomizaiton_file_path, 'r') as f:
     randomization_settings = json.load(f)
 print(f"Loaded {len(randomization_settings)} randomization settings from {randomizaiton_file_path}")
 
 framesToGen = 10
+if not IS_TEST_RUN:
+    if GENERATE_FOR_TRAINING:
+        framesToGen = 10000
+    else:
+        framesToGen = 1000
 accumulation_frames = 10
 m.clock.exitFrame = accumulation_frames*framesToGen
 # capture frames 1*accumulation_frames, 2*accumulation_frames, ..., N*accumulation_frames
